@@ -97,47 +97,6 @@ TODO: Add screenshots
 
 ---
 
-## 🛠️ Installation
-
-### Prerequisites
-
-- **Node.js** 18 or higher
-- **npm** or **yarn**
-- **Rust** (for building Tauri desktop app)
-- At least one API key:
-  - [Claude API (Anthropic)](https://console.anthropic.com/)
-  - [OpenAI API](https://platform.openai.com/api-keys)
-  - [Gemini API (Google)](https://aistudio.google.com/app/apikey)
-
-### Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/Konalexon/VerbaMind.git
-cd VerbaMind
-
-# Install dependencies
-npm install
-
-# Run in development mode (web only)
-npm run dev
-
-# Or run as a desktop app
-npm run tauri dev
-```
-
-### Building for Production
-
-```bash
-# Build web version
-npm run build
-
-# Build desktop app (creates .exe for Windows, .dmg for macOS, etc.)
-npm run tauri build
-```
-
----
-
 ## 💻 Usage
 
 ### 1. Add API Keys
