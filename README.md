@@ -91,7 +91,7 @@ All API keys are stored **locally on your device**. Your data never touches our 
 <!-- 
 TODO: Add screenshots
 <p align="center">
-  <img src="docs/screenshots/main.png" alt="Main Interface" width="800" />
+  <img src="C:\xampp\htdocs\Ai-Speech-Assistant\verbamind\src-tauri\target\release\resources\screenshots\Program.png" alt="Main Interface" width="800" />
 </p>
 -->
 
@@ -190,18 +190,9 @@ verbamind/
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to:
-- 🐛 Report bugs
-- 💡 Suggest features
-- 🔧 Submit pull requests
-
----
-
 ## 📄 License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **Rust License** — see the [LICENSE](LICENSE) file for details.
 
 ---
 
