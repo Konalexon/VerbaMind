@@ -101,33 +101,6 @@ All API keys are stored **locally on your device**. Your data never touches our 
   - [OpenAI API](https://platform.openai.com/api-keys)
   - [Gemini API (Google)](https://aistudio.google.com/app/apikey)
 
-### Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/Konalexon/VerbaMind.git
-cd VerbaMind
-
-# Install dependencies
-npm install
-
-# Run in development mode (web only)
-npm run dev
-
-# Or run as a desktop app
-npm run tauri dev
-```
-
-### Building for Production
-
-```bash
-# Build web version
-npm run build
-
-# Build desktop app (creates .exe for Windows, .dmg for macOS, etc.)
-npm run tauri build
-```
-
 ---
 
 ## 💻 Usage
@@ -234,5 +207,5 @@ This project is licensed under the **Rust License** — see the [LICENSE](LICENS
 </p>
 
 <p align="center">
-  Made with ❤️ using AI
+  Made with ❤️ by SpartaKoli!
 </p>
