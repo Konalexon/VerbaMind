@@ -6,7 +6,8 @@ import {
     FileDown,
     RefreshCw,
     ChevronDown,
-    Check
+    Check,
+    Sparkles
 } from 'lucide-react';
 import { useSpeechStore } from '../stores/speechStore';
 import type { PDFTemplate } from '../types';
@@ -38,142 +39,223 @@ export function SpeechResult({ onRegenerate, onExportPDF }: SpeechResultProps) {
     };
 
     const getScoreColor = (score: number) => {
-        if (score >= 90) return 'text-green-400';
-        if (score >= 75) return 'text-yellow-400';
-        return 'text-red-400';
+        if (score >= 90) return '#22c55e';
+        if (score >= 75) return '#eab308';
+        return '#ef4444';
     };
-
-    const getScoreBarWidth = (score: number) => `${score}%`;
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="glass-panel p-8 rounded-2xl max-w-3xl mx-auto"
+            className="speech-result-container"
+            style={{
+                background: 'rgba(15, 15, 20, 0.8)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                borderRadius: '24px',
+                padding: '32px',
+                maxWidth: '900px',
+                margin: '0 auto',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.4), 0 0 40px rgba(139, 92, 246, 0.1)'
+            }}
         >
             {/* Success Header */}
-            <div className="flex items-center gap-3 mb-6">
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                marginBottom: '24px',
+                padding: '20px',
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                borderRadius: '16px',
+                border: '1px solid rgba(34, 197, 94, 0.3)'
+            }}>
                 <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', delay: 0.2 }}
+                    style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
                 >
-                    <CheckCircle2 className="w-8 h-8 text-green-500" />
+                    <Sparkles size={24} color="white" />
                 </motion.div>
                 <div>
-                    <h2 className="text-xl font-semibold text-white">
+                    <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'white', marginBottom: '4px' }}>
                         Przemówienie gotowe!
                     </h2>
-                    <p className="text-zinc-400 text-sm">
+                    <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>
                         {currentResult.wasRefined
-                            ? 'Tekst został zweryfikowany i dopracowany przez wielomodelowy system AI.'
+                            ? 'Tekst został zweryfikowany i dopracowany przez AI.'
                             : 'Tekst osiągnął wysoką jakość bez potrzeby dodatkowej korekty.'}
                     </p>
                 </div>
             </div>
 
-            {/* Overall Score */}
-            <div className="mb-6 p-4 bg-dark-tertiary/50 rounded-xl">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-zinc-300">Quality Score</span>
-                    <span className={`text-2xl font-bold ${getScoreColor(currentResult.overallScore)}`}>
+            {/* Quality Score */}
+            <div style={{
+                padding: '20px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                marginBottom: '24px'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '500', color: 'rgba(255,255,255,0.7)' }}>
+                        Ocena jakości
+                    </span>
+                    <span style={{
+                        fontSize: '28px',
+                        fontWeight: '700',
+                        color: getScoreColor(currentResult.overallScore),
+                        textShadow: `0 0 20px ${getScoreColor(currentResult.overallScore)}40`
+                    }}>
                         {currentResult.overallScore}%
                     </span>
                 </div>
-                <div className="score-bar">
+                <div style={{
+                    height: '8px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    borderRadius: '4px',
+                    overflow: 'hidden'
+                }}>
                     <motion.div
-                        className="score-bar-fill"
                         initial={{ width: 0 }}
-                        animate={{ width: getScoreBarWidth(currentResult.overallScore) }}
+                        animate={{ width: `${currentResult.overallScore}%` }}
                         transition={{ duration: 1, delay: 0.3 }}
+                        style={{
+                            height: '100%',
+                            background: `linear-gradient(90deg, ${getScoreColor(currentResult.overallScore)} 0%, ${getScoreColor(currentResult.overallScore)}80 100%)`,
+                            borderRadius: '4px',
+                            boxShadow: `0 0 10px ${getScoreColor(currentResult.overallScore)}60`
+                        }}
                     />
                 </div>
             </div>
 
             {/* Verification Results */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-                {currentResult.verificationResults.map((result, index) => (
-                    <motion.div
-                        key={result.model}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.4 + index * 0.1 }}
-                        className="verification-badge success"
-                    >
-                        <CheckCircle2 size={16} className="text-green-500" />
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs text-zinc-400 truncate">{result.model}</p>
-                            <p className={`font-semibold ${getScoreColor(result.score)}`}>
-                                {result.score}%
-                            </p>
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-dark-border my-6" />
+            {currentResult.verificationResults.length > 0 && (
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                    gap: '12px',
+                    marginBottom: '24px'
+                }}>
+                    {currentResult.verificationResults.map((result, index) => (
+                        <motion.div
+                            key={result.model}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.4 + index * 0.1 }}
+                            style={{
+                                padding: '16px',
+                                background: 'rgba(34, 197, 94, 0.1)',
+                                border: '1px solid rgba(34, 197, 94, 0.3)',
+                                borderRadius: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px'
+                            }}
+                        >
+                            <CheckCircle2 size={18} color="#22c55e" />
+                            <div>
+                                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{result.model}</p>
+                                <p style={{ fontSize: '16px', fontWeight: '600', color: getScoreColor(result.score) }}>
+                                    {result.score}%
+                                </p>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            )}
 
             {/* Speech Text */}
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.7 }}
-                className="mb-6"
+                transition={{ delay: 0.5 }}
+                style={{
+                    padding: '24px',
+                    background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.5) 100%)',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    maxHeight: '400px',
+                    overflowY: 'auto',
+                    marginBottom: '24px'
+                }}
+                className="scrollbar-thin"
             >
-                <div
-                    className="p-6 rounded-xl max-h-96 overflow-y-auto scrollbar-thin"
-                    style={{
-                        background: 'rgba(20, 20, 25, 0.8)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)'
-                    }}
-                >
-                    <div className="prose prose-invert max-w-none">
-                        {currentResult.text.split('\n').map((paragraph, i) => (
-                            paragraph.trim() && (
-                                <p key={i} className="text-zinc-200 leading-relaxed mb-4 last:mb-0">
-                                    {paragraph}
-                                </p>
-                            )
-                        ))}
-                    </div>
-                </div>
+                {currentResult.text.split('\n').map((paragraph, i) => (
+                    paragraph.trim() && (
+                        <p key={i} style={{
+                            color: 'rgba(255,255,255,0.9)',
+                            lineHeight: '1.8',
+                            marginBottom: '16px',
+                            fontSize: '15px'
+                        }}>
+                            {paragraph}
+                        </p>
+                    )
+                ))}
             </motion.div>
 
             {/* Actions */}
-            <div className="flex flex-wrap gap-3">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                 {/* Copy Button */}
                 <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleCopy}
-                    className="btn-secondary flex items-center gap-2"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 20px',
+                        background: copied ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                        border: copied ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '12px',
+                        color: copied ? '#22c55e' : 'white',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                    }}
                 >
-                    {copied ? (
-                        <>
-                            <Check size={18} className="text-green-500" />
-                            <span>Skopiowano!</span>
-                        </>
-                    ) : (
-                        <>
-                            <Copy size={18} />
-                            <span>Kopiuj tekst</span>
-                        </>
-                    )}
+                    {copied ? <Check size={18} /> : <Copy size={18} />}
+                    <span>{copied ? 'Skopiowano!' : 'Kopiuj tekst'}</span>
                 </motion.button>
 
                 {/* PDF Export */}
-                <div className="relative">
+                <div style={{ position: 'relative' }}>
                     <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setShowTemplateSelect(!showTemplateSelect)}
-                        className="btn-secondary flex items-center gap-2"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '12px 20px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '12px',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500'
+                        }}
                     >
                         <FileDown size={18} />
                         <span>Eksportuj PDF</span>
-                        <ChevronDown size={16} className={`transition-transform ${showTemplateSelect ? 'rotate-180' : ''}`} />
+                        <ChevronDown size={16} style={{ transform: showTemplateSelect ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                     </motion.button>
 
                     {/* Template Dropdown */}
@@ -181,7 +263,20 @@ export function SpeechResult({ onRegenerate, onExportPDF }: SpeechResultProps) {
                         <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="absolute top-full left-0 mt-2 w-64 p-2 bg-dark-secondary border border-dark-border rounded-xl shadow-xl z-10"
+                            style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                marginTop: '8px',
+                                width: '280px',
+                                padding: '8px',
+                                background: 'rgba(20, 20, 25, 0.98)',
+                                backdropFilter: 'blur(20px)',
+                                border: '1px solid rgba(139, 92, 246, 0.3)',
+                                borderRadius: '16px',
+                                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
+                                zIndex: 100
+                            }}
                         >
                             {pdfTemplates.map((template) => (
                                 <button
@@ -191,11 +286,21 @@ export function SpeechResult({ onRegenerate, onExportPDF }: SpeechResultProps) {
                                         onExportPDF(template.value);
                                         setShowTemplateSelect(false);
                                     }}
-                                    className={`w-full p-3 text-left rounded-lg transition-colors hover:bg-dark-tertiary ${selectedTemplate === template.value ? 'bg-dark-tertiary' : ''
-                                        }`}
+                                    style={{
+                                        width: '100%',
+                                        padding: '14px 16px',
+                                        textAlign: 'left',
+                                        background: selectedTemplate === template.value ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        cursor: 'pointer',
+                                        transition: 'background 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = selectedTemplate === template.value ? 'rgba(139, 92, 246, 0.2)' : 'transparent'}
                                 >
-                                    <p className="font-medium text-white">{template.label}</p>
-                                    <p className="text-xs text-zinc-400">{template.description}</p>
+                                    <p style={{ color: 'white', fontWeight: '500', marginBottom: '4px' }}>{template.label}</p>
+                                    <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{template.description}</p>
                                 </button>
                             ))}
                         </motion.div>
@@ -207,7 +312,19 @@ export function SpeechResult({ onRegenerate, onExportPDF }: SpeechResultProps) {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={onRegenerate}
-                    className="btn-secondary flex items-center gap-2"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 20px',
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(6, 182, 212, 0.2) 100%)',
+                        border: '1px solid rgba(139, 92, 246, 0.4)',
+                        borderRadius: '12px',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                    }}
                 >
                     <RefreshCw size={18} />
                     <span>Regeneruj</span>
