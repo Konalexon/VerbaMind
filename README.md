@@ -86,7 +86,14 @@ All API keys are stored **locally on your device**. Your data never touches our 
 
 <p align="center">
   <img src="docs/screenshots/Program.png" alt="Main Interface" width="800" />
+  <br/><em>🎨 Main Interface - Speech Generation</em>
 </p>
+
+<p align="center">
+  <img src="docs/screenshots/Program2.png" alt="Past Speeches View" width="800" />
+  <br/><em>📜 Past Speeches - History & Details</em>
+</p>
+
 ---
 
 
