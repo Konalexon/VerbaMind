@@ -1,204 +1,220 @@
 // PDF Generation Service for VerbaMind
+// Uses jsPDF for real PDF generation with Polish character support
+import { jsPDF } from 'jspdf';
 import type { PDFTemplate } from '../types';
+import { RobotoRegular } from './robotoFont';
 
-interface PDFContent {
-    title: string;
-    text: string;
-    author?: string;
-    date?: string;
-    template: PDFTemplate;
-}
-
-// Template styles
-const templateStyles: Record<PDFTemplate, {
-    headerBg: string;
-    headerText: string;
-    bodyBg: string;
-    bodyText: string;
-    fontFamily: string;
-    titleSize: string;
-}> = {
-    official: {
-        headerBg: '#1a1a2e',
-        headerText: '#ffffff',
-        bodyBg: '#ffffff',
-        bodyText: '#333333',
-        fontFamily: 'Georgia, serif',
-        titleSize: '28px',
-    },
-    modern: {
-        headerBg: 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)',
-        headerText: '#ffffff',
-        bodyBg: '#fafafa',
-        bodyText: '#333333',
-        fontFamily: "'Inter', sans-serif",
-        titleSize: '32px',
-    },
-    minimal: {
-        headerBg: '#ffffff',
-        headerText: '#000000',
-        bodyBg: '#ffffff',
-        bodyText: '#444444',
-        fontFamily: "'Inter', sans-serif",
-        titleSize: '24px',
-    },
-    academic: {
-        headerBg: '#ffffff',
-        headerText: '#000000',
-        bodyBg: '#ffffff',
-        bodyText: '#000000',
-        fontFamily: "'Times New Roman', Times, serif",
-        titleSize: '18px',
-    },
+// Register Roboto font for Polish character support
+const registerRobotoFont = (doc: jsPDF) => {
+  doc.addFileToVFS('Roboto-Regular.ttf', RobotoRegular);
+  doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+  doc.setFont('Roboto');
 };
 
-function generateHTMLContent(content: PDFContent): string {
-    const styles = templateStyles[content.template];
-    const formattedDate = content.date || new Date().toLocaleDateString('pl-PL', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
+interface PDFContent {
+  title: string;
+  text: string;
+  author?: string;
+  date?: string;
+  template: PDFTemplate;
+}
 
-    const paragraphs = content.text
-        .split('\n')
-        .filter(p => p.trim())
-        .map(p => `<p style="margin-bottom: 1.2em; line-height: 1.8;">${p}</p>`)
-        .join('');
+// Template configurations
+const templateConfigs: Record<PDFTemplate, {
+  headerBg: [number, number, number];
+  headerText: [number, number, number];
+  bodyText: [number, number, number];
+  titleSize: number;
+  bodySize: number;
+  fontStyle: 'helvetica' | 'times' | 'courier';
+}> = {
+  official: {
+    headerBg: [26, 26, 46],
+    headerText: [255, 255, 255],
+    bodyText: [51, 51, 51],
+    titleSize: 24,
+    bodySize: 12,
+    fontStyle: 'times',
+  },
+  modern: {
+    headerBg: [139, 92, 246],
+    headerText: [255, 255, 255],
+    bodyText: [51, 51, 51],
+    titleSize: 28,
+    bodySize: 11,
+    fontStyle: 'helvetica',
+  },
+  minimal: {
+    headerBg: [255, 255, 255],
+    headerText: [0, 0, 0],
+    bodyText: [68, 68, 68],
+    titleSize: 20,
+    bodySize: 11,
+    fontStyle: 'helvetica',
+  },
+  academic: {
+    headerBg: [255, 255, 255],
+    headerText: [0, 0, 0],
+    bodyText: [0, 0, 0],
+    titleSize: 16,
+    bodySize: 12,
+    fontStyle: 'times',
+  },
+};
 
-    if (content.template === 'modern') {
-        return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page { margin: 0; size: A4; }
-    body { font-family: ${styles.fontFamily}; background: ${styles.bodyBg}; color: ${styles.bodyText}; }
-    .header { background: ${styles.headerBg}; padding: 50px; color: ${styles.headerText}; }
-    .title { font-size: ${styles.titleSize}; font-weight: 700; margin-bottom: 10px; }
-    .meta { font-size: 14px; opacity: 0.8; }
-    .content { padding: 50px; font-size: 12pt; text-align: justify; }
-    .footer { position: fixed; bottom: 30px; left: 50px; right: 50px; font-size: 10px; color: #999; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="title">${content.title}</div>
-    <div class="meta">${content.author ? `${content.author} • ` : ''}${formattedDate}</div>
-  </div>
-  <div class="content">${paragraphs}</div>
-  <div class="footer">Wygenerowano przez VerbaMind • ${formattedDate}</div>
-</body>
-</html>`;
+function wrapText(doc: jsPDF, text: string, maxWidth: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const testWidth = doc.getTextWidth(testLine);
+
+    if (testWidth > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
     }
+  }
 
-    if (content.template === 'academic') {
-        return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page { margin: 72px; size: A4; }
-    body { font-family: ${styles.fontFamily}; background: ${styles.bodyBg}; color: ${styles.bodyText}; font-size: 12pt; line-height: 2; }
-    .title { font-size: ${styles.titleSize}; font-weight: 700; text-align: center; margin-bottom: 24px; }
-    .author { font-size: 12pt; text-align: center; font-style: italic; margin-bottom: 48px; }
-    .content { text-align: justify; text-indent: 24px; }
-    .content p { margin-bottom: 0; }
-  </style>
-</head>
-<body>
-  <div class="title">${content.title}</div>
-  ${content.author ? `<div class="author">${content.author}</div>` : ''}
-  <div class="content">${paragraphs}</div>
-</body>
-</html>`;
-    }
+  if (currentLine) {
+    lines.push(currentLine);
+  }
 
-    if (content.template === 'minimal') {
-        return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page { margin: 80px; size: A4; }
-    body { font-family: ${styles.fontFamily}; background: ${styles.bodyBg}; color: ${styles.bodyText}; font-size: 11pt; }
-    .title { font-size: ${styles.titleSize}; font-weight: 600; margin-bottom: 60px; }
-    .content { line-height: 2; }
-  </style>
-</head>
-<body>
-  <div class="title">${content.title}</div>
-  <div class="content">${paragraphs}</div>
-</body>
-</html>`;
-    }
-
-    // Official (default)
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page { margin: 60px; size: A4; }
-    body { font-family: ${styles.fontFamily}; background: ${styles.bodyBg}; color: ${styles.bodyText}; font-size: 12pt; }
-    .header { background: ${styles.headerBg}; color: ${styles.headerText}; padding: 40px; margin: -60px -60px 40px -60px; }
-    .title { font-size: ${styles.titleSize}; font-weight: 700; margin-bottom: 10px; }
-    .meta { font-size: 14px; opacity: 0.7; }
-    .content { text-align: justify; line-height: 1.8; }
-    .footer { position: fixed; bottom: 40px; left: 60px; right: 60px; font-size: 10px; color: #999; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="title">${content.title}</div>
-    <div class="meta">${content.author ? `${content.author} • ` : ''}${formattedDate}</div>
-  </div>
-  <div class="content">${paragraphs}</div>
-  <div class="footer">Wygenerowano przez VerbaMind</div>
-</body>
-</html>`;
+  return lines;
 }
 
 export async function exportToPDF(content: PDFContent): Promise<void> {
-    const html = generateHTMLContent(content);
+  const config = templateConfigs[content.template];
+  const formattedDate = content.date || new Date().toLocaleDateString('pl-PL', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-        throw new Error('Could not open print window. Please allow popups.');
+  // Create PDF document (A4 format)
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  const contentWidth = pageWidth - margin * 2;
+  let yPosition = margin;
+
+  // Register and set Roboto font for Polish character support
+  registerRobotoFont(doc);
+
+  // Draw header background (for official and modern templates)
+  if (content.template === 'official' || content.template === 'modern') {
+    doc.setFillColor(...config.headerBg);
+    doc.rect(0, 0, pageWidth, 50, 'F');
+
+    // Add gradient effect for modern template
+    if (content.template === 'modern') {
+      doc.setFillColor(6, 182, 212);
+      doc.rect(pageWidth - 60, 0, 60, 50, 'F');
     }
 
-    printWindow.document.write(html);
-    printWindow.document.close();
+    yPosition = 20;
+  }
 
-    // Wait for styles and fonts to load
-    await new Promise(resolve => setTimeout(resolve, 500));
+  // Title
+  doc.setFontSize(config.titleSize);
+  if (content.template === 'official' || content.template === 'modern') {
+    doc.setTextColor(...config.headerText);
+  } else {
+    doc.setTextColor(...config.bodyText);
+  }
 
-    // Trigger print dialog (which allows saving as PDF)
-    printWindow.print();
+  const titleLines = wrapText(doc, content.title, contentWidth);
+  for (const line of titleLines) {
+    if (content.template === 'academic') {
+      doc.text(line, pageWidth / 2, yPosition, { align: 'center' });
+    } else {
+      doc.text(line, margin, yPosition);
+    }
+    yPosition += config.titleSize * 0.5;
+  }
+
+  // Meta info (date, author)
+  doc.setFontSize(10);
+  if (content.template === 'official' || content.template === 'modern') {
+    doc.setTextColor(200, 200, 200);
+  } else {
+    doc.setTextColor(128, 128, 128);
+  }
+
+  const metaText = content.author ? `${content.author} • ${formattedDate}` : formattedDate;
+  if (content.template === 'academic') {
+    yPosition += 5;
+    doc.text(metaText, pageWidth / 2, yPosition, { align: 'center' });
+  } else {
+    yPosition += 5;
+    doc.text(metaText, margin, yPosition);
+  }
+
+  // Move past header
+  if (content.template === 'official' || content.template === 'modern') {
+    yPosition = 65;
+  } else {
+    yPosition += 20;
+  }
+
+  // Body text
+  doc.setFontSize(config.bodySize);
+  doc.setTextColor(...config.bodyText);
+
+  const paragraphs = content.text.split('\n').filter(p => p.trim());
+  const lineHeight = config.bodySize * 0.5;
+
+  for (const paragraph of paragraphs) {
+    const lines = wrapText(doc, paragraph.trim(), contentWidth);
+
+    for (const line of lines) {
+      // Check if we need a new page
+      if (yPosition > pageHeight - margin - 20) {
+        doc.addPage();
+        yPosition = margin;
+      }
+
+      doc.text(line, margin, yPosition, { align: 'justify' });
+      yPosition += lineHeight;
+    }
+
+    yPosition += lineHeight * 0.5; // Paragraph spacing
+  }
+
+  // Footer
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(
+      `Wygenerowano przez VerbaMind • Strona ${i} z ${totalPages}`,
+      pageWidth / 2,
+      pageHeight - 10,
+      { align: 'center' }
+    );
+  }
+
+  // Generate filename
+  const filename = `${content.title.replace(/[^a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s]/g, '_')}.pdf`;
+
+  // Save PDF
+  doc.save(filename);
+
+  // Return success for notification
+  return Promise.resolve();
 }
 
-// Alternative: Generate HTML file for download
+// Export for backward compatibility
 export function downloadAsHTML(content: PDFContent): void {
-    const html = generateHTMLContent(content);
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${content.title.replace(/[^a-zA-Z0-9]/g, '_')}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  exportToPDF(content);
 }
