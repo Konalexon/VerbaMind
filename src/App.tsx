@@ -5,11 +5,17 @@ import {
   Settings as SettingsIcon,
   Moon,
   Sun,
-  Loader2
+  Loader2,
+  Copy,
+  Check,
+  FileDown,
+  MessageSquare,
+  CheckCircle2
 } from 'lucide-react';
 import { useSpeechStore } from './stores/speechStore';
 import { SpeechResult } from './components/SpeechResult';
 import { Settings } from './components/Settings';
+import { TitleBar } from './components/TitleBar';
 import { generateSpeech } from './services/llmService';
 import { exportToPDF } from './services/pdfService';
 import type { SpeechParams, PDFTemplate, ToneType, DurationType, AudienceType } from './types';
@@ -54,11 +60,14 @@ function App() {
     history,
     isGenerating,
     generationProgress,
+    error,
     setParams,
   } = useSpeechStore();
 
   const [showSettings, setShowSettings] = useState(false);
   const [view, setView] = useState<'form' | 'result'>('form');
+  const [copied, setCopied] = useState(false);
+  const [pdfExported, setPdfExported] = useState(false);
 
   // Form state
   const [topic, setTopic] = useState('');
@@ -67,10 +76,21 @@ function App() {
   const [audience, setAudience] = useState<AudienceType>('biznesowi');
   const [details, setDetails] = useState('');
 
+  const handleCopy = async () => {
+    if (!currentResult?.text) return;
+    await navigator.clipboard.writeText(currentResult.text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const hasApiKeys = apiKeys.claude || apiKeys.openai || apiKeys.gemini;
 
   const handleGenerate = useCallback(async () => {
-    if (!topic.trim() || !hasApiKeys) return;
+    console.log('handleGenerate called. hasApiKeys:', hasApiKeys, 'apiKeys:', apiKeys);
+    if (!topic.trim() || !hasApiKeys) {
+      console.log('Generation skipped - no topic or no API keys');
+      return;
+    }
 
     const params: SpeechParams = { topic, tone, duration, audience, details };
     setParams(params);
@@ -81,7 +101,7 @@ function App() {
     try {
       const result = await generateSpeech(params, apiKeys, setProgress);
       setResult(result);
-      setView('result');
+      // NIE przełączamy widoku - wynik wyświetla się w sekcji AI Output pod formularzem
 
       addToHistory({
         id: crypto.randomUUID(),
@@ -107,12 +127,16 @@ function App() {
 
     try {
       await exportToPDF({
-        title: topic,
+        title: topic || 'Przemówienie',
         text: currentResult.text,
         template,
       });
+      // Pokaż powiadomienie o sukcesie
+      setPdfExported(true);
+      setTimeout(() => setPdfExported(false), 3000);
     } catch (error) {
       console.error('PDF export error:', error);
+      alert('Błąd podczas eksportu PDF. Spróbuj ponownie.');
     }
   }, [currentResult, topic]);
 
@@ -132,7 +156,42 @@ function App() {
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'dark-mode' : 'light-mode'}`}>
+    <div className={`min-h-screen app-with-titlebar ${isDarkMode ? 'dark-mode' : 'light-mode'}`}>
+      {/* Custom Title Bar - jak Discord */}
+      <TitleBar />
+
+      {/* PDF Export Success Toast */}
+      <AnimatePresence>
+        {pdfExported && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+            style={{
+              position: 'fixed',
+              top: '50px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 1000,
+              background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(22, 163, 74, 0.95) 100%)',
+              backdropFilter: 'blur(10px)',
+              padding: '16px 28px',
+              borderRadius: '12px',
+              boxShadow: '0 10px 40px rgba(34, 197, 94, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+          >
+            <CheckCircle2 size={24} color="white" />
+            <span style={{ color: 'white', fontWeight: '600', fontSize: '15px' }}>
+              📄 Plik PDF został pobrany!
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Background gradient */}
       <div className="bg-gradient-overlay" />
 
@@ -310,6 +369,60 @@ function App() {
                   )}
                 </div>
               </div>
+
+              {/* AI Output Section - Glass */}
+              <motion.div
+                className="ai-output-section"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <div className="ai-output-header">
+                  <MessageSquare size={18} style={{ color: 'var(--accent-secondary)' }} />
+                  <span className="ai-output-title">AI Generated Speech</span>
+                </div>
+
+                <div className="ai-output-content scrollbar-thin">
+                  {isGenerating ? (
+                    <div className="ai-output-empty">
+                      <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 0.75rem', display: 'block', color: 'var(--accent-secondary)' }} />
+                      <span>{generationProgress || 'Generating your speech...'}</span>
+                    </div>
+                  ) : error ? (
+                    <div className="ai-output-error">
+                      <span style={{ color: '#f87171', fontWeight: 500 }}>⚠️ Error:</span>
+                      <p style={{ color: '#fca5a5', marginTop: '0.5rem' }}>{error}</p>
+                    </div>
+                  ) : currentResult?.text ? (
+                    <div className="ai-output-text">
+                      {currentResult.text.split('\n').map((paragraph, i) => (
+                        paragraph.trim() && (
+                          <p key={i}>{paragraph}</p>
+                        )
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="ai-output-empty">
+                      Your generated speech will appear here...
+                    </p>
+                  )}
+                </div>
+
+                {currentResult?.text && (
+                  <div className="ai-output-actions">
+                    <button onClick={handleCopy} className="btn-secondary">
+                      {copied ? (
+                        <><Check size={16} className="text-green-500" /> Copied!</>
+                      ) : (
+                        <><Copy size={16} /> Copy</>
+                      )}
+                    </button>
+                    <button onClick={() => handleExportPDF('modern')} className="btn-secondary">
+                      <FileDown size={16} /> Export PDF
+                    </button>
+                  </div>
+                )}
+              </motion.div>
             </motion.div>
           ) : (
             <motion.div

@@ -83,6 +83,36 @@ Odbiorcy: ${params.audience}
 
 Zwróć TYLKO poprawiony tekst przemówienia, bez komentarzy czy wyjaśnień.`;
 
+// Humanizer - podrasowuje tekst, usuwa frazy AI
+const HUMANIZER_PROMPT = (speech: string) => `Jesteś ekspertem od pisania naturalnych tekstów. 
+Twoje zadanie to SUBTELNIE podrasować poniższy tekst, aby brzmiał bardziej naturalnie i ludzko.
+
+ZASADY:
+1. USUŃ lub ZAMIEŃ typowe frazy AI takie jak:
+   - "Podsumowując..." → użyj czegoś kreatywnego lub pomiń
+   - "Warto zauważyć..." → przejdź od razu do meritum
+   - "W dzisiejszych czasach..." → bądź konkretny
+   - "Jak wiemy..." → pomiń lub zamień na pytanie retoryczne
+   - "Nie da się ukryć..." → po prostu stwierdź fakt
+   - "Zanurzmy się..." → pomiń
+   
+2. ZACHOWAJ:
+   - Główny przekaz i strukturę
+   - Długość tekstu (+-10%)
+   - Ton i styl
+
+3. DODAJ naturalność:
+   - Krótsze zdania gdzie pasuje
+   - Naturalny rytm mowy
+   - Ludzkie zwroty frazowe
+
+Tekst do podrasowania:
+"""
+${speech}
+"""
+
+Zwróć TYLKO podrasowany tekst, bez komentarzy.`;
+
 // API calling functions
 async function callClaude(apiKey: string, prompt: string): Promise<string> {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -131,27 +161,64 @@ async function callOpenAI(apiKey: string, prompt: string): Promise<string> {
 }
 
 async function callGemini(apiKey: string, prompt: string): Promise<string> {
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-            }),
-        }
-    );
+    console.log('Calling Gemini API with key:', apiKey.substring(0, 8) + '...');
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Gemini API error:', response.status, errorData);
-        throw new Error(`Gemini API error: ${response.status}`);
+    // Lista modeli do wypróbowania (od najnowszych do starszych)
+    const models = [
+        'gemini-2.5-flash',
+        'gemini-2.5-pro',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-pro',
+        'gemini-pro',
+    ];
+
+    let lastError: Error | null = null;
+
+    for (const model of models) {
+        try {
+            console.log(`Trying Gemini model: ${model}`);
+
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                    }),
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.warn(`Gemini model ${model} failed:`, response.status, errorData?.error?.message);
+                lastError = new Error(`Gemini ${model}: ${errorData?.error?.message || response.status}`);
+                continue; // Próbuj następny model
+            }
+
+            const data = await response.json();
+
+            if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+                console.warn(`Gemini model ${model}: Invalid response structure`);
+                lastError = new Error(`Gemini ${model}: No content in response`);
+                continue;
+            }
+
+            console.log(`Gemini API success with model: ${model}`);
+            return data.candidates[0].content.parts[0].text;
+
+        } catch (e) {
+            console.warn(`Gemini model ${model} error:`, e);
+            lastError = e instanceof Error ? e : new Error(String(e));
+            continue;
+        }
     }
 
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
+    // Wszystkie modele zawiodły
+    throw lastError || new Error('All Gemini models failed');
 }
 
 // Helper to call the best available API
@@ -204,7 +271,8 @@ function parseJSON(text: string): { score: number; feedback: string[] } {
 export async function generateSpeech(
     params: SpeechParams,
     apiKeys: ApiKeys,
-    onProgress: (status: string) => void
+    onProgress: (status: string) => void,
+    fastMode: boolean = true // Domyślnie szybki tryb - tylko generowanie
 ): Promise<GenerationResult> {
     // Phase 1: Generate initial speech
     onProgress('Generowanie przemówienia...');
@@ -214,73 +282,77 @@ export async function generateSpeech(
         'claude'
     );
 
-    // Phase 2: Multi-model verification (if multiple keys available)
+    // Phase 2: Weryfikacja (opcjonalna w trybie szybkim)
     const verificationResults: VerificationResult[] = [];
-    const keysAvailable = Object.values(apiKeys).filter(Boolean).length;
 
-    if (keysAvailable >= 1) {
-        onProgress('Weryfikacja jakości...');
+    if (!fastMode) {
+        // Pełna weryfikacja - wolniejsza ale dokładniejsza
+        const keysAvailable = Object.values(apiKeys).filter(Boolean).length;
 
-        // Naturalness check
-        try {
-            const naturalnessResponse = await callBestAvailableAPI(
-                apiKeys,
-                NATURALNESS_PROMPT(initialSpeech),
-                'claude'
-            );
-            const naturalness = parseJSON(naturalnessResponse);
-            verificationResults.push({
-                model: 'Naturalność',
-                aspect: 'naturalness',
-                score: naturalness.score,
-                feedback: naturalness.feedback,
-                icon: '🗣️',
-            });
-        } catch (e) {
-            console.warn('Naturalness check failed', e);
-        }
+        if (keysAvailable >= 1) {
+            onProgress('Weryfikacja jakości...');
 
-        // Style check (prefer OpenAI)
-        if (apiKeys.openai || apiKeys.claude || apiKeys.gemini) {
+            // Naturalness check
             try {
-                onProgress('Analiza stylu...');
-                const styleResponse = await callBestAvailableAPI(
+                const naturalnessResponse = await callBestAvailableAPI(
                     apiKeys,
-                    STYLE_PROMPT(initialSpeech, params.tone),
-                    'openai'
+                    NATURALNESS_PROMPT(initialSpeech),
+                    'claude'
                 );
-                const style = parseJSON(styleResponse);
+                const naturalness = parseJSON(naturalnessResponse);
                 verificationResults.push({
-                    model: 'Styl',
-                    aspect: 'style',
-                    score: style.score,
-                    feedback: style.feedback,
-                    icon: '✍️',
+                    model: 'Naturalność',
+                    aspect: 'naturalness',
+                    score: naturalness.score,
+                    feedback: naturalness.feedback,
+                    icon: '🗣️',
                 });
             } catch (e) {
-                console.warn('Style check failed', e);
+                console.warn('Naturalness check failed', e);
             }
-        }
 
-        // Logic check (prefer Gemini)
-        if (apiKeys.gemini || apiKeys.claude || apiKeys.openai) {
-            try {
-                onProgress('Sprawdzanie logiki...');
-                const logicResponse = await callBestAvailableAPI(
-                    apiKeys,
-                    LOGIC_PROMPT(initialSpeech),
-                    'gemini'
-                );
-                const logic = parseJSON(logicResponse);
-                verificationResults.push({
-                    model: 'Logika',
-                    aspect: 'logic',
-                    score: logic.score,
-                    feedback: logic.feedback,
-                    icon: '🧠',
-                });
-            } catch (e) {
-                console.warn('Logic check failed', e);
+            // Style check (prefer OpenAI)
+            if (apiKeys.openai || apiKeys.claude || apiKeys.gemini) {
+                try {
+                    onProgress('Analiza stylu...');
+                    const styleResponse = await callBestAvailableAPI(
+                        apiKeys,
+                        STYLE_PROMPT(initialSpeech, params.tone),
+                        'openai'
+                    );
+                    const style = parseJSON(styleResponse);
+                    verificationResults.push({
+                        model: 'Styl',
+                        aspect: 'style',
+                        score: style.score,
+                        feedback: style.feedback,
+                        icon: '✍️',
+                    });
+                } catch (e) {
+                    console.warn('Style check failed', e);
+                }
+            }
+
+            // Logic check (prefer Gemini)
+            if (apiKeys.gemini || apiKeys.claude || apiKeys.openai) {
+                try {
+                    onProgress('Sprawdzanie logiki...');
+                    const logicResponse = await callBestAvailableAPI(
+                        apiKeys,
+                        LOGIC_PROMPT(initialSpeech),
+                        'gemini'
+                    );
+                    const logic = parseJSON(logicResponse);
+                    verificationResults.push({
+                        model: 'Logika',
+                        aspect: 'logic',
+                        score: logic.score,
+                        feedback: logic.feedback,
+                        icon: '🧠',
+                    });
+                } catch (e) {
+                    console.warn('Logic check failed', e);
+                }
             }
         }
     }
@@ -288,7 +360,7 @@ export async function generateSpeech(
     // Calculate overall score
     const overallScore = verificationResults.length > 0
         ? Math.round(verificationResults.reduce((sum, r) => sum + r.score, 0) / verificationResults.length)
-        : 90; // Default if no verification
+        : 90; // Default if no verification (szybki tryb)
 
     // Phase 3: Refinement if needed
     let finalText = initialSpeech;
@@ -308,6 +380,19 @@ export async function generateSpeech(
         } catch (e) {
             console.warn('Refinement failed, using original', e);
         }
+    }
+
+    // Phase 4: Humanizer - podrasowuje tekst, usuwa typowe frazy AI
+    onProgress('Podrasowywanie tekstu...');
+    try {
+        finalText = await callBestAvailableAPI(
+            apiKeys,
+            HUMANIZER_PROMPT(finalText),
+            'gemini' // Gemini jest szybszy
+        );
+    } catch (e) {
+        console.warn('Humanizer failed, using original', e);
+        // Jeśli humanizer nie zadziała, używamy oryginalnego tekstu
     }
 
     onProgress('Gotowe!');
