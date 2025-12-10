@@ -89,19 +89,6 @@ All API keys are stored **locally on your device**. Your data never touches our 
 </p>
 ---
 
-## 🛠️ Installation
-
-### Prerequisites
-
-- **Node.js** 18 or higher
-- **npm** or **yarn**
-- **Rust** (for building Tauri desktop app)
-- At least one API key:
-  - [Claude API (Anthropic)](https://console.anthropic.com/)
-  - [OpenAI API](https://platform.openai.com/api-keys)
-  - [Gemini API (Google)](https://aistudio.google.com/app/apikey)
-
----
 
 ## 💻 Usage
 
